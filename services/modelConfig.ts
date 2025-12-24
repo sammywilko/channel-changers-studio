@@ -18,10 +18,10 @@ export const MODELS = {
   image: "gemini-3-pro-image-preview",
   
   // Text-to-Speech (multi-speaker)
-  tts: "gemini-2.5-flash-preview-tts",
+  tts: "gemini-3-flash-preview-preview-tts",
   
   // Fast inference for simple tasks
-  flash: "gemini-2.5-flash",
+  flash: "gemini-3-flash-preview",
   
   // Vision capable (same as text for Gemini 3)
   vision: "gemini-3-pro-preview",

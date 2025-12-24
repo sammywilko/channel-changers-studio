@@ -957,7 +957,7 @@ export async function testImageGenerationModels() {
 
   const modelsToTest = [
     'gemini-3-pro-image-preview',
-    'gemini-2.0-flash-thinking-exp-01-21',
+    'gemini-3-flash-preview-thinking-exp-01-21',
     'gemini-3-pro-preview',
     'imagen-3.0-generate-001'
   ];
