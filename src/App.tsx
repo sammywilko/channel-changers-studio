@@ -16,12 +16,14 @@ import ImageEditor from '../components/ImageEditor';
 import Dashboard from '../components/Dashboard';
 import BriefComposer from '../components/BriefComposer';
 import ProducerChat from '../components/ProducerChat';
-import { Layers, FileText, Loader2, Cpu, ArrowRight, LayoutDashboard, X, Download, Settings2, Table, RefreshCw, Wand2, AlertTriangle, GripVertical, Archive, Cloud, CheckCircle, Save, AlertCircle, Upload, Check, MessageCircle } from 'lucide-react';
+// 🆕 NEW FEATURE IMPORTS
+import { PDFExportModal, SketchToImagePanel, InPaintPanel, ImportFromScriptEngineModal } from '../components/NewFeaturesPanel';
+import { Layers, FileText, Loader2, Cpu, ArrowRight, LayoutDashboard, X, Download, Settings2, Table, RefreshCw, Wand2, AlertTriangle, GripVertical, Archive, Cloud, CheckCircle, Save, AlertCircle, Upload, Check, MessageCircle, Pencil, FileDown } from 'lucide-react';
 import clsx from 'clsx';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 
-const APP_VERSION = "10.0.0";
+const APP_VERSION = "10.1.0";
 
 const App: React.FC = () => {
   // Project System State
@@ -60,9 +62,17 @@ const App: React.FC = () => {
   // Export Dropdown State
   const [isExportOpen, setIsExportOpen] = useState(false);
 
+  // 🆕 NEW FEATURE MODAL STATES
+  const [isPDFExportOpen, setIsPDFExportOpen] = useState(false);
+  const [isSketchPanelOpen, setIsSketchPanelOpen] = useState(false);
+  const [isInPaintOpen, setIsInPaintOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [inPaintImage, setInPaintImage] = useState<string | null>(null);
+  const [inPaintBeatId, setInPaintBeatId] = useState<string | null>(null);
+
   // --- INIT ---
   useEffect(() => {
-    console.log(`🎬 Channel Changers Studio v${APP_VERSION} - Loaded`);
+    console.log(`🎬 Director v${APP_VERSION} - Loaded`);
     setProjects(getProjects());
     // Load current project
     const currentProj = getCurrentProject();
@@ -214,6 +224,49 @@ const App: React.FC = () => {
   
   const updateProject = (updates: Partial<Project>) => {
      setCurrentProject(prev => prev ? { ...prev, ...updates } : null);
+  };
+
+  // 🆕 IMPORT FROM SCRIPT ENGINE HANDLER
+  const handleImportFromScriptEngine = (importedProject: any) => {
+    // Merge imported data with a new project
+    const newProj = createNewProject(importedProject.name || 'Imported Project', 'narrative', 'blank');
+    
+    // Apply imported data
+    const mergedProject = {
+      ...newProj,
+      ...importedProject,
+      id: newProj.id, // Keep new ID
+      createdAt: Date.now(),
+    };
+    
+    saveProject(mergedProject);
+    setProjects(getProjects());
+    setCurrentProject(mergedProject);
+    setStep(mergedProject.structure ? GenerationStep.COMPLETE : GenerationStep.IDLE);
+    setActiveTab('board');
+  };
+
+  // 🆕 IN-PAINT HANDLER - Open in-paint for specific beat
+  const handleOpenInPaint = (beatId: string, image: string) => {
+    setInPaintBeatId(beatId);
+    setInPaintImage(image);
+    setIsInPaintOpen(true);
+  };
+
+  // 🆕 IN-PAINT APPLY HANDLER
+  const handleInPaintApply = (newImage: string) => {
+    if (inPaintBeatId && currentProject?.structure) {
+      handleUpdateBeatImage(inPaintBeatId, newImage);
+    }
+    setIsInPaintOpen(false);
+    setInPaintImage(null);
+    setInPaintBeatId(null);
+  };
+
+  // 🆕 SKETCH TO IMAGE HANDLER
+  const handleSketchImageGenerated = (image: string) => {
+    // Add to lightbox for now, user can then use it
+    setLightboxImage(image);
   };
 
   // --- MULTIPLE IMAGE UPLOAD HANDLER ---
@@ -1197,7 +1250,7 @@ const App: React.FC = () => {
              <div className="w-8 h-8 rounded bg-gradient-to-br from-nano-pink to-purple-600 flex items-center justify-center shadow-lg shadow-nano-pink/20"><Cpu size={18} className="text-white" /></div>
              <div>
                <h1 className="text-lg font-bold tracking-tight text-white truncate max-w-[200px]">{currentProject.name}</h1>
-               <p className="text-[10px] text-gray-500 font-mono tracking-wider flex items-center gap-2"><span className={clsx("w-2 h-2 rounded-full", currentProject.structure ? "bg-green-500" : "bg-gray-500")}></span> STUDIO v{APP_VERSION}</p>
+               <p className="text-[10px] text-gray-500 font-mono tracking-wider flex items-center gap-2"><span className={clsx("w-2 h-2 rounded-full", currentProject.structure ? "bg-green-500" : "bg-gray-500")}></span> DIRECTOR v{APP_VERSION}</p>
              </div>
           </div>
           <div className="flex items-center space-x-4">
@@ -1223,6 +1276,14 @@ const App: React.FC = () => {
              {activeTab === 'board' && (
                 <button onClick={handleCheckContinuity} className="bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white px-3 py-1.5 rounded text-xs font-bold flex items-center gap-2 border border-gray-700"><AlertTriangle size={14} className="text-yellow-500" /> Check Continuity</button>
              )}
+
+             {/* 🆕 SKETCH TO IMAGE BUTTON */}
+             <button 
+               onClick={() => setIsSketchPanelOpen(true)} 
+               className="bg-purple-900/50 hover:bg-purple-800/50 text-purple-300 hover:text-white px-3 py-1.5 rounded text-xs font-bold flex items-center gap-2 border border-purple-700"
+             >
+               <Pencil size={14} /> Sketch
+             </button>
              
              <div className="relative">
                 <button 
@@ -1235,6 +1296,8 @@ const App: React.FC = () => {
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setIsExportOpen(false)} />
                     <div className="absolute top-full right-0 mt-2 w-56 bg-gray-900 border border-gray-700 rounded shadow-xl z-50">
+                       {/* 🆕 PDF EXPORT */}
+                       <button onClick={() => { setIsExportOpen(false); setIsPDFExportOpen(true); }} className="w-full text-left px-4 py-2 text-xs text-gray-300 hover:bg-gray-800 flex items-center gap-2 border-b border-gray-700"><FileDown size={14} className="text-cyan-400"/> Export PDF Storyboard</button>
                        <button onClick={handleExportScript} className="w-full text-left px-4 py-2 text-xs text-gray-300 hover:bg-gray-800 flex items-center gap-2"><FileText size={14}/> Export Script (TXT)</button>
                        <button onClick={handleExportCSV} className="w-full text-left px-4 py-2 text-xs text-gray-300 hover:bg-gray-800 flex items-center gap-2"><Table size={14}/> Export Shot List (CSV)</button>
                        <button onClick={handleDownloadZIP} className="w-full text-left px-4 py-2 text-xs text-gray-300 hover:bg-gray-800 flex items-center gap-2"><Archive size={14}/> Download Assets (ZIP)</button>
@@ -1246,6 +1309,9 @@ const App: React.FC = () => {
                               Save to Google Drive
                           </button>
                        )}
+
+                       {/* 🆕 IMPORT FROM SCRIPT ENGINE */}
+                       <button onClick={() => { setIsExportOpen(false); setIsImportOpen(true); }} className="w-full text-left px-4 py-2 text-xs text-gray-300 hover:bg-gray-800 flex items-center gap-2 border-t border-gray-700"><Upload size={14} className="text-green-400"/> Import from Script Engine</button>
                     </div>
                   </>
                 )}
@@ -1285,7 +1351,7 @@ const App: React.FC = () => {
                   projectType={currentProject.type}
                 />
 
-                <div className="flex justify-center gap-4">
+                <div className="flex justify-center gap-4 flex-wrap">
                   <button
                     onClick={handleInitializeGeneration}
                     disabled={!currentProject.idea.trim()}
@@ -1303,6 +1369,15 @@ const App: React.FC = () => {
                   >
                     <MessageCircle className="w-6 h-6" />
                     Chat with Producer
+                  </button>
+
+                  {/* 🆕 IMPORT FROM SCRIPT ENGINE */}
+                  <button
+                    onClick={() => setIsImportOpen(true)}
+                    className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-500 hover:to-teal-500 text-white px-6 py-4 rounded-lg font-bold text-lg flex items-center gap-3 shadow-lg transition-all"
+                  >
+                    <Upload className="w-6 h-6" />
+                    Import Script
                   </button>
                 </div>
               </div>
@@ -1422,7 +1497,24 @@ const App: React.FC = () => {
                                  isProduct ? (
                                     <ProductShotCard key={beat.beat_id} shot={beat} onGenerateImage={handleGenerateImage} onOpenLightbox={setLightboxImage} onUpdateShot={handleUpdateBeat} aspectRatio={currentProject.aspectRatio} brandAssets={currentProject.brandAssets || []} />
                                  ) : (
-                                    <BeatCard key={beat.beat_id} beat={beat} currentUser={currentProject.team[0]} onGenerateImage={handleGenerateImage} onPromptChange={handlePromptChange} onOpenLightbox={setLightboxImage} onSelectImage={handleSelectImage} onLikeFeedback={handleLikeFeedback} onDislikeFeedback={handleDislikeFeedback} onUpdateStatus={handleUpdateStatus} onAddComment={handleAddComment} onRestorePrompt={handleRestorePrompt} onGenerateSuggestions={handleGenerateSuggestions} aspectRatio={currentProject.aspectRatio} />
+                                    <BeatCard 
+                                      key={beat.beat_id} 
+                                      beat={beat} 
+                                      currentUser={currentProject.team[0]} 
+                                      onGenerateImage={handleGenerateImage} 
+                                      onPromptChange={handlePromptChange} 
+                                      onOpenLightbox={setLightboxImage} 
+                                      onSelectImage={handleSelectImage} 
+                                      onLikeFeedback={handleLikeFeedback} 
+                                      onDislikeFeedback={handleDislikeFeedback} 
+                                      onUpdateStatus={handleUpdateStatus} 
+                                      onAddComment={handleAddComment} 
+                                      onRestorePrompt={handleRestorePrompt} 
+                                      onGenerateSuggestions={handleGenerateSuggestions} 
+                                      aspectRatio={currentProject.aspectRatio}
+                                      // 🆕 IN-PAINT: Pass handler to open in-paint for this beat
+                                      onEditImage={(image: string) => handleOpenInPaint(beat.beat_id, image)}
+                                    />
                                  )
                                ))}
                              </div>
@@ -1452,7 +1544,14 @@ const App: React.FC = () => {
            <div className="max-w-[90vw] max-h-[90vh] relative" onClick={(e) => e.stopPropagation()}>
              <img src={lightboxImage} className="max-w-full max-h-full object-contain rounded shadow-2xl ring-1 ring-gray-800" />
              <div className="absolute bottom-4 right-4 flex space-x-2">
-                <button onClick={() => { const a = document.createElement('a'); a.href = lightboxImage; a.download = `nano_render.png`; document.body.appendChild(a); a.click(); document.body.removeChild(a); }} className="bg-nano-pink hover:bg-pink-600 text-white px-4 py-2 rounded flex items-center gap-2 text-sm font-bold shadow-lg transition-colors"><Download size={16} /> DOWNLOAD</button>
+                {/* 🆕 EDIT BUTTON IN LIGHTBOX */}
+                <button 
+                  onClick={() => { setInPaintImage(lightboxImage); setIsInPaintOpen(true); setLightboxImage(null); }} 
+                  className="bg-orange-600 hover:bg-orange-500 text-white px-4 py-2 rounded flex items-center gap-2 text-sm font-bold shadow-lg transition-colors"
+                >
+                  <Wand2 size={16} /> EDIT
+                </button>
+                <button onClick={() => { const a = document.createElement('a'); a.href = lightboxImage; a.download = `director_render.png`; document.body.appendChild(a); a.click(); document.body.removeChild(a); }} className="bg-nano-pink hover:bg-pink-600 text-white px-4 py-2 rounded flex items-center gap-2 text-sm font-bold shadow-lg transition-colors"><Download size={16} /> DOWNLOAD</button>
              </div>
            </div>
         </div>
@@ -1476,6 +1575,47 @@ const App: React.FC = () => {
           <span className="font-medium">{workflowStatus}</span>
         </div>
       )}
+
+      {/* 🆕 PDF EXPORT MODAL */}
+      {currentProject && (
+        <PDFExportModal
+          project={currentProject}
+          isOpen={isPDFExportOpen}
+          onClose={() => setIsPDFExportOpen(false)}
+        />
+      )}
+
+      {/* 🆕 SKETCH TO IMAGE PANEL */}
+      {currentProject && (
+        <SketchToImagePanel
+          worldLook={currentProject.worldLook || ''}
+          referenceImages={currentProject.styleReferences?.map(s => s.imageUrl) || []}
+          onImageGenerated={handleSketchImageGenerated}
+          isOpen={isSketchPanelOpen}
+          onClose={() => setIsSketchPanelOpen(false)}
+        />
+      )}
+
+      {/* 🆕 IN-PAINT EDITING PANEL */}
+      {inPaintImage && (
+        <InPaintPanel
+          image={inPaintImage}
+          onImageEdited={handleInPaintApply}
+          isOpen={isInPaintOpen}
+          onClose={() => {
+            setIsInPaintOpen(false);
+            setInPaintImage(null);
+            setInPaintBeatId(null);
+          }}
+        />
+      )}
+
+      {/* 🆕 IMPORT FROM SCRIPT ENGINE MODAL */}
+      <ImportFromScriptEngineModal
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        onImport={handleImportFromScriptEngine}
+      />
     </div>
   );
 };
